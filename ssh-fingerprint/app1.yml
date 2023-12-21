@@ -2,13 +2,13 @@
 # Nombre del playbook: Agregar huellas digitales SSH al archivo known_hosts para múltiples hosts
 # Se ejecuta en el host local (localhost) sin recopilar información sobre el sistema remoto
 - name: Add SSH fingerprints to known hosts file for multiple hosts
-  hosts: localhost
-  gather_facts: no
+  hosts: localhost # Se ejecuta en el host local (localhost)
+  gather_facts: no # No recopila información sobre el sistema
 
   tasks:
     # Tarea para obtener las claves públicas remotas de todos los hosts del grupo 'testing'
     - name: Get remote public keys for all hosts
-      ansible.builtin.command: "ssh-keyscan -H {{ item }}"
+      ansible.builtin.command: "ssh-keyscan -H {{ item }}"  # Comando para obtener la clave pública
       register: ssh_keyscan_output
       loop: "{{ groups['testing'] }}"  # Bucle a través de los hosts del grupo 'testing'
 
