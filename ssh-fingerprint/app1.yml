@@ -1,0 +1,15 @@
+- name: Add fingerprint SSH to known hosts file
+  hosts: localhost
+  tasks:
+    - name: Get remote public key
+      ansible.builtin.shell:
+        cmd: "ssh-keyscan -H 172.16.120.210"
+      register: ssh_keyscan_output
+
+    - name: Add remote public key to known hosts file
+      ansible.builtin.known_hosts:
+        name: 172.16.120.210
+        path: ~/.ssh/known_hosts
+        state: present
+        key: "{{ ssh_keyscan_output.stdout }}"
+        user: root
