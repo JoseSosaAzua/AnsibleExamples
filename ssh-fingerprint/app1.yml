@@ -1,15 +1,27 @@
-- name: Add fingerprint SSH to known hosts file
+---
+# Nombre del playbook: Agregar huellas digitales SSH al archivo known_hosts para múltiples hosts
+# Se ejecuta en el host local (localhost) sin recopilar información sobre el sistema remoto
+- name: Add SSH fingerprints to known hosts file for multiple hosts
   hosts: localhost
-  tasks:
-    - name: Get remote public key
-      ansible.builtin.shell:
-        cmd: "ssh-keyscan -H 172.16.120.210"
-      register: ssh_keyscan_output
+  gather_facts: no
 
-    - name: Add remote public key to known hosts file
-      ansible.builtin.known_hosts:
-        name: 172.16.120.210
-        path: ~/.ssh/known_hosts
-        state: present
-        key: "{{ ssh_keyscan_output.stdout }}"
-        user: root
+  tasks:
+    # Tarea para obtener las claves públicas remotas de todos los hosts del grupo 'testing'
+    - name: Get remote public keys for all hosts
+      ansible.builtin.command: "ssh-keyscan -H {{ item }}"
+      register: ssh_keyscan_output
+      loop: "{{ groups['testing'] }}"  # Bucle a través de los hosts del grupo 'testing'
+
+    # Tarea para agregar las claves públicas remotas al archivo known_hosts
+    - name: Add remote public keys to known hosts file
+      ansible.builtin.lineinfile:
+        line: "{{ item.stdout }}"  # Línea a agregar al archivo known_hosts (clave pública)
+        path: "~/.ssh/known_hosts"  # Ruta del archivo known_hosts en el directorio de inicio del usuario
+        create: yes  # Crea el archivo si no existe
+      loop: "{{ ssh_keyscan_output.results }}"  # Bucle a través de los resultados de ssh-keyscan
+      when: item.stdout is defined  # Verifica si la salida stdout está definida antes de agregar al archivo
+
+# Los módulos de Ansible utilizados en este playbook son:
+# - ansible.builtin.command: Ejecuta comandos en el host remoto para obtener huellas digitales SSH.
+# - ansible.builtin.lineinfile: Asegura la presencia de las huellas digitales en el archivo known_hosts.
+# Ambos son módulos integrados en Ansible y no requieren instalación adicional.
