@@ -1,33 +1,27 @@
 ---
-# Playbook para generar un par de claves SSH usando Ansible
-
-# Nombre del playbook
 - name: Generate SSH Key pair
-
-  # Se ejecuta en el equipo local
   hosts: localhost
-  
-  # No es necesario recolectar información del sistema remoto
   gather_facts: false
+  become: true
+  become_user: root
+  vars:
+    ansible_become_pass: 'j05ez05a'
 
-  # Tareas a realizar
   tasks:
-    # Tarea: Crear directorio para las claves SSH si no existe
-    - name: Create Directory if not exists
-      file:
-        path: ~/.ssh/ansible   # Ruta del directorio para almacenar las claves SSH
-        state: directory      # Indica que es un directorio
-        mode: '0700'          # Permisos para el directorio (lectura, escritura y ejecución solo para el propietario)
+    # Tarea: Verificar si la clave privada SSH ya existe
+    - name: check if SSH private key exists
+      ansible.builtin.stat:
+        path: /root/.ssh/id_rsa
+      register: ssh_key
 
-    # Tarea: Generar clave privada SSH
-    - name: Generar clave SSH
-      community.crypto.openssl_privatekey:
-        path: ~/.ssh/ansible/id_rsa   # Ruta donde se almacenará la clave privada
-        type: RSA                     # Tipo de clave SSH (RSA en este caso)
-        size: 2048                    # Tamaño de la clave (2048 bits en este caso)
+    # Tarea: Crear par de claves SSH y forzar sobrescritura si ya existen
+    - name: create SSH key pair
+      ansible.builtin.command: ssh-keygen -t rsa -b 2048 -f /root/.ssh/id_rsa -N '' -q
+      when: ssh_key.stat.exists == false or ssh_key.stat.islnk == true
 
-    # Tarea: Generar clave pública asociada a la clave privada generada
-    - name: Save asociate public key with private key
-      community.crypto.openssl_publickey:
-        privatekey_path: ~/.ssh/ansible/id_rsa   # Ruta de la clave privada para generar la clave pública
-        path: ~/.ssh/ansible/id_rsa.pub         # Ruta donde se almacenará la clave pública
+    # Tarea: Establecer permisos para la clave privada SSH
+    - name: set permissions for SSH private key
+      ansible.builtin.file:
+        path: /root/.ssh/id_rsa
+        owner: root
+        mode: '0600'
