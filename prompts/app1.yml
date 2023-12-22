@@ -1,0 +1,22 @@
+---
+- name: Generate SSH Key pair
+  hosts: localhost
+  gather_facts: no
+
+  vars_prompt:
+    - name: target_host
+      prompt: Target Host IP
+      private: false
+    - name: target_pass
+      prompt: Authentication method (password/key)
+      private: false
+
+  vars:
+    target_host: "{{ target_host.user_input }}"
+    target_pass: "{{ target_pass.user_input }}"
+
+  tasks:
+    - debug:
+            msg:
+                - "Host: {{ target_host }}"
+                - "Pass: {{ target_pass }}"
