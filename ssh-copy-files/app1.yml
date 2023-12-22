@@ -1,0 +1,12 @@
+---
+- name: Copiar clave pública a múltiples servidores remotos
+  hosts: localhost
+  gather_facts: false
+  become: true
+  become_user: root
+
+  tasks:
+    - name: Copiar clave pública a los servidores remotos
+      ansible.builtin.shell: ssh-copy-id -i /root/.ssh/id_rsa.pub root@{{ item }}
+      with_items: "{{ groups['testing'] }}"
+
