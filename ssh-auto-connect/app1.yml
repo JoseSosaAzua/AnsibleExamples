@@ -1,0 +1,101 @@
+- name: Add SSH fingerprints to known hosts file for multiple hosts
+  hosts: localhost 
+  gather_facts: no 
+  become: true
+  become_user: root
+
+  # -------------------------------------------------------------------------------
+  # -----                           VARIABLES PROMPT                          -----
+  # -------------------------------------------------------------------------------
+
+  vars_prompt:
+    
+    - name: ansible_become_pass
+      prompt: Contraseña usuario root
+      private: true
+
+    - name: target_remote_pass
+      prompt: Contraseña del host remoto
+      private: true
+
+    - name: target_knownhosts_path
+      prompt: Ubicacion archivo hosts
+      private: false
+      default: "~/.ssh/known_hosts"
+
+    - name: target_group_inventory
+      prompt: Grupo de hosts
+      private: false
+      default: "testing"
+
+  tasks:
+
+  # -------------------------------------------------------------------------------
+  # -----                 TAREA PARA INTALAR EL MODULO EXPECT                 -----
+  # -------------------------------------------------------------------------------
+
+
+    - name: Install expect package (if not installed)
+      ansible.builtin.package:
+        name: expect
+        state: present
+
+  # -------------------------------------------------------------------------------
+  # -----                     TAREA PARA GENERAR HUELLA SSH                   -----
+  # -------------------------------------------------------------------------------
+
+    - name: Get remote public keys for all hosts
+      ansible.builtin.command: "ssh-keyscan -H {{ item }}"
+      register: ssh_keyscan_output
+      loop: "{{ groups[target_group_inventory] }}"
+
+    - name: Add remote public keys to known hosts file
+      ansible.builtin.lineinfile:
+        line: "{{ item.stdout }}"  
+        path: "{{ target_knownhosts_path }}"
+        create: yes
+      loop: "{{ ssh_keyscan_output.results }}"
+      when:
+        - item.stdout is defined
+        - target_knownhosts_path | default('') != ''
+        - target_group_inventory | default('') != ''
+
+  # -------------------------------------------------------------------------------
+  # -----                    TAREA PARA CREAR LAS LLAVES SSH                  -----
+  # -------------------------------------------------------------------------------
+
+    - name: check if SSH private key exists
+      ansible.builtin.stat:
+        path: /root/.ssh/id_rsa
+      register: ssh_key
+      when:
+        - ansible_become_pass | default('') != ''
+
+    - name: create SSH key pair
+      ansible.builtin.command: ssh-keygen -t rsa -b 2048 -f /root/.ssh/id_rsa -N '' -q
+      when: 
+        - ssh_key.stat.exists == false or ssh_key.stat.islnk == true
+        - ansible_become_pass | default('') != ''
+
+    - name: set permissions for SSH private key
+      ansible.builtin.file:
+        path: /root/.ssh/id_rsa
+        owner: root
+        mode: '0600'
+      when: 
+        - ssh_key.stat.exists == false or ssh_key.stat.islnk == true
+        - ansible_become_pass | default('') != ''
+
+  # -------------------------------------------------------------------------------
+  # -----             TAREA PARA SUBIR LLAVES A LOS HOST REMOTOS              -----
+  # -------------------------------------------------------------------------------
+
+
+    - name: Copy SSH Key using ssh-copy-id with password
+      ansible.builtin.expect:
+        command: ssh-copy-id -i /root/.ssh/id_rsa.pub root@{{ item }}
+        responses:
+          ".*password.*": "{{ target_remote_pass }}"
+      with_items: "{{ groups[target_group_inventory] }}"
+
+
